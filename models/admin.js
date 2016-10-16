@@ -6,8 +6,8 @@ var crypto_encrypt_password = require('./crypto_encrypt_password.js');
 var token_sign_password = require('./token_sign_password.js');
 
 module.exports = function(sequelize, DataTypes) {
-	var user = sequelize.define('user', { 
-		email: { // email property of the user
+	var admin = sequelize.define('admin', { 
+		email: { // email property of the admin
 			type: DataTypes.STRING,
 			allowNull: false,
 			unique: true,
@@ -38,9 +38,9 @@ module.exports = function(sequelize, DataTypes) {
 		}
 	}, {
 		hooks: { // hook to verify 
-			beforeValidate: function(user, option) {
-				if (typeof(user.email) === 'string') {
-					user.email = user.email.toLowerCase();
+			beforeValidate: function(admin, option) {
+				if (typeof(admin.email) === 'string') {
+					admin.email = admin.email.toLowerCase();
 				}
 			}
 		},
@@ -51,31 +51,31 @@ module.exports = function(sequelize, DataTypes) {
 						return reject();
 					}
 
-					user.findOne({
+					admin.findOne({
 						where: {
 							email: body.email
 						}
-					}).then(function(user) {
-						if (!user || !(bcrypt.compareSync(body.password, user.get('password_hash')))) { // reject if user not found or wrong password
+					}).then(function(admin) {
+						if (!admin || !(bcrypt.compareSync(body.password, admin.get('password_hash')))) { // reject if admin not found or wrong password
 							return reject();
 						}
 
-						resolve(user);
+						resolve(admin);
 					}, function() {
 						reject();
 					})
 				})
 			},
-			findByToken: function(token) { // find user by a given token at 'Auth' header of a request
+			findByToken: function(token) { // find admin by a given token at 'Auth' header of a request
 				return new Promise(function (resolve, reject) {
 					try {
 						var decodedJWT = jwt.verify(token, token_sign_password);
 						var bytes = cryptojs.AES.decrypt(decodedJWT.token, crypto_encrypt_password); // decrypt token
 						var tokenData = JSON.parse(bytes.toString(cryptojs.enc.Utf8)); // convert JSON format to object
 
-						user.findById(tokenData.userId).then(function (user) { // find user by token id
-							if (user) {
-								resolve(user);
+						admin.findById(tokenData.adminId).then(function (admin) { // find admin by token id
+							if (admin) {
+								resolve(admin);
 							} else {
 								reject();
 							}
@@ -102,7 +102,7 @@ module.exports = function(sequelize, DataTypes) {
 
 				try {
 					var stringData = JSON.stringify({ // stringify an object into JSON format
-						userId: this.get('id'),
+						adminId: this.get('id'),
 						type: type
 					})
 					var encryptedData = cryptojs.AES.encrypt(stringData, crypto_encrypt_password).toString(); // encrypt token
@@ -118,5 +118,5 @@ module.exports = function(sequelize, DataTypes) {
 			}
 		}
 	});
-	return user;
+	return admin;
 };

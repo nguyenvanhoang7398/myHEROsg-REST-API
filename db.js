@@ -21,6 +21,7 @@ db.sequelize = sequelize;
 db.Sequelize = Sequelize;
 
 db.user = sequelize.import(__dirname + '/models/user.js');
+db.admin = sequelize.import(__dirname + '/models/admin.js');
 
 db.token = sequelize.import(__dirname + '/models/token.js');
 

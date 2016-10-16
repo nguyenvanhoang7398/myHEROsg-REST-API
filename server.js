@@ -4,7 +4,8 @@ var bcrypt = require('bcrypt');
 var _ = require('underscore');
 var bodyParser = require('body-parser');
 var db = require('./db.js');
-var middleware = require('./middleware.js')(db);
+var middleware_user = require('./middleware/middleware_user.js')(db);
+var middleware_admin = require('./middleware/middleware_admin.js')(db);
 
 var app = express();
 var PORT = process.env.PORT || 3000; //PORT 3000 for local host, process.env.PORT for public server 
@@ -153,7 +154,81 @@ app.post('/users/login', function(req, res) {
  * _ header:
  *   + 'Auth': valid token for login session
  */
-app.delete('/users/login', middleware.requireAuthentication, function(req, res) {
+app.delete('/users/login', middleware_user.requireAuthentication, function(req, res) {
+    req.token.destroy().then(function () { // Destroy current valid token for login session
+        res.status(204).send();
+    }).catch(function (e) {
+        console.log(e);
+        res.status(500).send();
+    })
+});
+
+/** Create admin account providing email and password
+ *
+ * @author: Nguyen Van Hoang
+ *
+ * URL: POST /admins
+ * 
+ * @req: 
+ * _ body: JSON format of 2 properties email and password
+ * 
+ * @res: 
+ * - body: Pulic JSON format of created account
+ */
+app.post('/admins', function(req, res) {
+    var body = _.pick(req.body, 'email', 'password');
+
+    db.admin.create(body).then(function(admin) { // Create new admin account
+        res.status(200).json(admin.toPublicJSON());
+    }, function(e) {
+        res.status(400).json(e.errors);
+    });
+});
+
+/** Login admin account provding email and password
+ *
+ * @author: Nguyen Van Hoang
+ *
+ * URL: POST /admins
+ * 
+ * @req: 
+ * _ body: JSON format of 2 properties email and password
+ *
+ * @res: 
+ * _ body: Public JSON format of login account
+ * _ header:
+ *   + 'Auth': valid token for login session
+ */
+app.post('/admins/login', function(req, res) {
+    var body = _.pick(req.body, 'email', 'password');
+    var adminInstance;
+
+    db.admin.authenticate(body).then(function(admin) { // authenticate admin account
+        var token = admin.generateToken('authentication');
+        adminInstance = admin;
+
+        return db.token.create({
+            token: token
+        });
+    }).then(function(tokenInstance) {
+        res.header('Auth', tokenInstance.get('token')).json(adminInstance.toPublicJSON()); // send valid token for login session by 'Auth' header
+    }).catch (function(e) {
+        console.log(e);
+        res.status(401).send();
+    });
+})
+
+/** Logout admin account
+ *
+ * @author
+ *
+ * URL: DELETE /users/login
+ * 
+ * @req:
+ * _ header:
+ *   + 'Auth': valid token for login session
+ */
+app.delete('/admins/login', middleware_admin.requireAuthentication, function(req, res) {
     req.token.destroy().then(function () { // Destroy current valid token for login session
         res.status(204).send();
     }).catch(function (e) {
