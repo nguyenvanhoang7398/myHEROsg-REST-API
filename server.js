@@ -220,9 +220,9 @@ app.post('/admins/login', function(req, res) {
 
 /** Logout admin account
  *
- * @author
+ * @author Nguyen Van Hoang
  *
- * URL: DELETE /users/login
+ * URL: DELETE /admins/login
  * 
  * @req:
  * _ header:
@@ -235,6 +235,31 @@ app.delete('/admins/login', middleware_admin.requireAuthentication, function(req
         console.log(e);
         res.status(500).send();
     })
+});
+
+/** Show all registered users
+ * @author Nguyen Van Hoang
+ *
+ * URL: GET /admins/users
+ * 
+ * @req:
+ * _ header:
+ *   + 'Auth': valid token for login session
+ * 
+ * @res:
+ * _ body: JSON format of all users
+ */
+app.get('/admins/users', middleware_admin.requireAuthentication, function(req, res) {
+    db.user.findAll().then(function(users) {
+        users.forEach(function(user) {
+            user = user.toPublicJSON();
+        })
+        return users
+    }, function() {
+        res.status(500).send();
+    }).then(function(users) {
+        res.status(200).json(users);
+    });
 });
 
 db.sequelize.sync({
