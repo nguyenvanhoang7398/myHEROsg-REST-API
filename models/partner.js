@@ -6,15 +6,16 @@ var crypto_encrypt_password = require('./crypto_encrypt_password.js');
 var token_sign_password = require('./token_sign_password.js');
 
 module.exports = function(sequelize, DataTypes) {
-	var user = sequelize.define('user', { 
-		userName: {
+	var partner = sequelize.define('partner', { 
+		partnerName: {
 			type: DataTypes.STRING,
 			allowNull: false,
+			unique: true,
 			validate: {
-				len: [1, 100]
+				len: [1, 200]
 			}
 		},
-		email: { // email property of the user
+		email: { // email property of the partner
 			type: DataTypes.STRING,
 			allowNull: false,
 			unique: true,
@@ -22,13 +23,26 @@ module.exports = function(sequelize, DataTypes) {
 				isEmail: true
 			}
 		},
+		address: {
+			type: DataTypes.STRING,
+			allowNull: false,
+			unique: true,
+			validate: {
+				len: [1, 200]
+			}
+		},
 		phone: {
 			type: DataTypes.STRING,
-			allowNull: true,
+			allowNull: false,
 			unique: true,
 			validate: {
 				len: [1, 20]
 			}
+		},
+		verified: {
+			type: DataTypes.BOOLEAN,
+			allowNull: false,
+			defaultValue: false
 		},
 		salt: { // salt created for hashing password
 			type: DataTypes.STRING
@@ -53,9 +67,9 @@ module.exports = function(sequelize, DataTypes) {
 		}
 	}, {
 		hooks: { // hook to verify 
-			beforeValidate: function(user, option) {
-				if (typeof(user.email) === 'string') {
-					user.email = user.email.toLowerCase();
+			beforeValidate: function(partner, option) {
+				if (typeof(partner.email) === 'string') {
+					partner.email = partner.email.toLowerCase();
 				}
 			}
 		},
@@ -66,31 +80,31 @@ module.exports = function(sequelize, DataTypes) {
 						return reject();
 					}
 
-					user.findOne({
+					partner.findOne({
 						where: {
 							email: body.email
 						}
-					}).then(function(user) {
-						if (!user || !(bcrypt.compareSync(body.password, user.get('password_hash')))) { // reject if user not found or wrong password
+					}).then(function(partner) {
+						if (!partner || !(bcrypt.compareSync(body.password, partner.get('password_hash')))) { // reject if partner not found or wrong password
 							return reject();
 						}
 
-						resolve(user);
+						resolve(partner);
 					}, function() {
 						reject();
 					})
 				})
 			},
-			findByToken: function(token) { // find user by a given token at 'Auth' header of a request
+			findByToken: function(token) { // find partner by a given token at 'Auth' header of a request
 				return new Promise(function (resolve, reject) {
 					try {
 						var decodedJWT = jwt.verify(token, token_sign_password);
 						var bytes = cryptojs.AES.decrypt(decodedJWT.token, crypto_encrypt_password); // decrypt token
 						var tokenData = JSON.parse(bytes.toString(cryptojs.enc.Utf8)); // convert JSON format to object
 
-						user.findById(tokenData.userId).then(function (user) { // find user by token id
-							if (user) {
-								resolve(user);
+						partner.findById(tokenData.partnerId).then(function (partner) { // find partner by token id
+							if (partner) {
+								resolve(partner);
 							} else {
 								reject();
 							}
@@ -108,7 +122,7 @@ module.exports = function(sequelize, DataTypes) {
 		instanceMethods: {
 			toPublicJSON: function() {
 				var json = this.toJSON();
-				return _.pick(json, 'id', 'userName', 'email', 'phone', 'createdAt', 'updatedAt'); // only choose 'id', 'email', 'createdAt', 'updatedAt' properties to expose to public clients
+				return _.pick(json, 'id', 'partnerName', 'address', 'phone', 'email', 'verified', 'createdAt', 'updatedAt'); // only choose 'id', 'email', 'createdAt', 'updatedAt' properties to expose to public clients
 			},
 			generateToken: function (type) { // generate new token
 				if (!(_.isString(type))) {
@@ -117,7 +131,7 @@ module.exports = function(sequelize, DataTypes) {
 
 				try {
 					var stringData = JSON.stringify({ // stringify an object into JSON format
-						userId: this.get('id'),
+						partnerId: this.get('id'),
 						type: type
 					})
 					var encryptedData = cryptojs.AES.encrypt(stringData, crypto_encrypt_password).toString(); // encrypt token
@@ -133,5 +147,5 @@ module.exports = function(sequelize, DataTypes) {
 			}
 		}
 	});
-	return user;
+	return partner;
 };

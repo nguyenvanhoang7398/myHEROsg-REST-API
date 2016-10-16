@@ -17,12 +17,13 @@ var db = {};
 
 // import local content of models
 db.gp = sequelize.import(__dirname + '/models/gp.js'); 
-db.sequelize = sequelize;
-db.Sequelize = Sequelize;
-
 db.user = sequelize.import(__dirname + '/models/user.js');
 db.admin = sequelize.import(__dirname + '/models/admin.js');
+db.partner = sequelize.import(__dirname + '/models/partner.js');
 
 db.token = sequelize.import(__dirname + '/models/token.js');
+
+db.sequelize = sequelize;
+db.Sequelize = Sequelize;
 
 module.exports = db;

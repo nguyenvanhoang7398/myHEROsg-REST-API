@@ -6,6 +6,7 @@ var bodyParser = require('body-parser');
 var db = require('./db.js');
 var middleware_user = require('./middleware/middleware_user.js')(db);
 var middleware_admin = require('./middleware/middleware_admin.js')(db);
+var middleware_partner = require('./middleware/middleware_partner.js')(db);
 
 var app = express();
 var PORT = process.env.PORT || 3000; //PORT 3000 for local host, process.env.PORT for public server 
@@ -102,7 +103,7 @@ app.get('/gps/:id', function(req, res) {
  * - body: Pulic JSON format of created account
  */
 app.post('/users', function(req, res) {
-    var body = _.pick(req.body, 'email', 'password');
+    var body = _.pick(req.body, 'userName', 'email', 'phone', 'password');
 
     db.user.create(body).then(function(user) { // Create new user account
         res.status(200).json(user.toPublicJSON());
@@ -155,6 +156,80 @@ app.post('/users/login', function(req, res) {
  *   + 'Auth': valid token for login session
  */
 app.delete('/users/login', middleware_user.requireAuthentication, function(req, res) {
+    req.token.destroy().then(function () { // Destroy current valid token for login session
+        res.status(204).send();
+    }).catch(function (e) {
+        console.log(e);
+        res.status(500).send();
+    })
+});
+
+/** Create partner account providing email and password
+ *
+ * @author: Nguyen Van Hoang
+ *
+ * URL: POST /partners
+ * 
+ * @req: 
+ * _ body: JSON format of 2 properties email and password
+ * 
+ * @res: 
+ * - body: Pulic JSON format of created account
+ */
+app.post('/partners', function(req, res) {
+    var body = _.pick(req.body, 'partnerName', 'email', 'address', 'phone', 'password');
+
+    db.partner.create(body).then(function(partner) { // Create new partner account
+        res.status(200).json(partner.toPublicJSON());
+    }, function(e) {
+        res.status(400).json(e.errors);
+    });
+});
+
+/** Login partner account provding email and password
+ *
+ * @author: Nguyen Van Hoang
+ *
+ * URL: POST /partners
+ * 
+ * @req: 
+ * _ body: JSON format of 2 properties email and password
+ *
+ * @res: 
+ * _ body: Public JSON format of login account
+ * _ header:
+ *   + 'Auth': valid token for login session
+ */
+app.post('/partners/login', function(req, res) {
+    var body = _.pick(req.body, 'email', 'password');
+    var partnerInstance;
+
+    db.partner.authenticate(body).then(function(partner) { // authenticate partner account
+        var token = partner.generateToken('authentication');
+        partnerInstance = partner;
+
+        return db.token.create({
+            token: token
+        });
+    }).then(function(tokenInstance) {
+        res.header('Auth', tokenInstance.get('token')).json(partnerInstance.toPublicJSON()); // send valid token for login session by 'Auth' header
+    }).catch (function(e) {
+        console.log(e);
+        res.status(401).send();
+    });
+})
+
+/** Logout partner account
+ *
+ * @author Nguyen Van Hoang
+ *
+ * URL: DELETE /partners/login
+ * 
+ * @req:
+ * _ header:
+ *   + 'Auth': valid token for login session
+ */
+app.delete('/partners/login', middleware_partner.requireAuthentication, function(req, res) {
     req.token.destroy().then(function () { // Destroy current valid token for login session
         res.status(204).send();
     }).catch(function (e) {
@@ -240,7 +315,7 @@ app.delete('/admins/login', middleware_admin.requireAuthentication, function(req
 /** Show all registered users
  * @author Nguyen Van Hoang
  *
- * URL: GET /admins/users
+ * URL: GET /admins/admins
  * 
  * @req:
  * _ header:
@@ -251,14 +326,37 @@ app.delete('/admins/login', middleware_admin.requireAuthentication, function(req
  */
 app.get('/admins/users', middleware_admin.requireAuthentication, function(req, res) {
     db.user.findAll().then(function(users) {
+        var publicUsers = [];
         users.forEach(function(user) {
-            user = user.toPublicJSON();
+            publicUsers.push(user.toPublicJSON());
         })
-        return users
+        res.status(200).json(publicUsers);
     }, function() {
         res.status(500).send();
-    }).then(function(users) {
-        res.status(200).json(users);
+    });
+});
+
+/** Show all registered partners
+ * @author Nguyen Van Hoang
+ *
+ * URL: GET /admins/partners
+ * 
+ * @req:
+ * _ header:
+ *   + 'Auth': valid token for login session
+ * 
+ * @res:
+ * _ body: JSON format of all partners
+ */
+app.get('/admins/partners', middleware_admin.requireAuthentication, function(req, res) {
+    db.partner.findAll().then(function(partners) {
+        var publicPartners = [];
+        partners.forEach(function(partner) {
+            publicPartners.push(partner.toPublicJSON());
+        })
+        res.status(200).json(publicPartners);
+    }, function() {
+        res.status(500).send();
     });
 });
 
