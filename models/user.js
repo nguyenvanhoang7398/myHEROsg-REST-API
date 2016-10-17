@@ -2,8 +2,12 @@ var bcrypt = require('bcrypt');
 var _ = require('underscore');
 var cryptojs = require('crypto-js');
 var jwt = require('jsonwebtoken');
-var crypto_encrypt_password = require('./crypto_encrypt_password.js');
-var token_sign_password = require('./token_sign_password.js');
+var crypto_encrypt_password = require.main.require('./encrypt_and_hash_code/crypto_encrypt_password.js');
+var token_sign_password = require.main.require('./encrypt_and_hash_code/token_sign_password.js');
+var encrypt_email_code = require.main.require('./encrypt_and_hash_code/email_verification_password.js');
+
+var Crypt = require('cryptr');
+crypt = new Crypt(encrypt_email_code);
 
 module.exports = function(sequelize, DataTypes) {
 	var user = sequelize.define('user', { 
@@ -29,6 +33,11 @@ module.exports = function(sequelize, DataTypes) {
 			validate: {
 				len: [1, 20]
 			}
+		},
+		verified: {
+			type: DataTypes.BOOLEAN,
+			allowNull: false,
+			defaultValue: false
 		},
 		salt: { // salt created for hashing password
 			type: DataTypes.STRING
@@ -61,9 +70,12 @@ module.exports = function(sequelize, DataTypes) {
 		},
 		classMethods: { 
 			authenticate: function(body) { // authenticate a given login body
+				var errorAuth = {
+					errors: "Authentication failed or email not verified"
+				};
 				return new Promise(function(resolve, reject) {
 					if (!(_.isString(body.email) && _.isString(body.password))) { // reject if email and password is not string
-						return reject();
+						return reject(errorAuth);
 					}
 
 					user.findOne({
@@ -71,13 +83,14 @@ module.exports = function(sequelize, DataTypes) {
 							email: body.email
 						}
 					}).then(function(user) {
-						if (!user || !(bcrypt.compareSync(body.password, user.get('password_hash')))) { // reject if user not found or wrong password
-							return reject();
+						console.log("status: " + user.get('verified'));
+						if (!user || !(bcrypt.compareSync(body.password, user.get('password_hash'))) || user.get('verified') === false) { // reject if user not found or wrong password
+							return reject(errorAuth);
 						}
 
 						resolve(user);
 					}, function() {
-						reject();
+						reject(errorAuth);
 					})
 				})
 			},
@@ -103,12 +116,37 @@ module.exports = function(sequelize, DataTypes) {
 						reject();
 					}
 				})
+			},
+			verifyEmail: function(encrypted_email) { // verify email of the user given a string of encrypted email at the end of id
+				var errorsVerify = { // Verifying error message
+					errors: "Cannot verify this email"
+				}
+				return new Promise(function (resolve, reject) { 
+					try {
+						var emailData = crypt.decrypt(encrypted_email); // decrypt email
+						console.log("email after decrypted" + emailData);
+						user.findOne({ // search in user database
+							where: {
+								email: emailData
+							}
+						}).then(function(user) {
+							if (user && user.get('verified') === false) { // user must not be verified before
+								resolve(user);
+							} else {
+								reject();
+							}
+						})
+					} catch (e) {
+						console.log(e);
+						reject();
+					}
+				})
 			}
 		},
 		instanceMethods: {
 			toPublicJSON: function() {
 				var json = this.toJSON();
-				return _.pick(json, 'id', 'userName', 'email', 'phone', 'createdAt', 'updatedAt'); // only choose 'id', 'email', 'createdAt', 'updatedAt' properties to expose to public clients
+				return _.pick(json, 'id', 'userName', 'email', 'phone', 'createdAt', 'updatedAt', 'verified'); // only choose 'id', 'email', 'createdAt', 'updatedAt' properties to expose to public clients
 			},
 			generateToken: function (type) { // generate new token
 				if (!(_.isString(type))) {

@@ -2,8 +2,8 @@ var bcrypt = require('bcrypt');
 var _ = require('underscore');
 var cryptojs = require('crypto-js');
 var jwt = require('jsonwebtoken');
-var crypto_encrypt_password = require('./crypto_encrypt_password.js');
-var token_sign_password = require('./token_sign_password.js');
+var crypto_encrypt_password = require.main.require('./encrypt_and_hash_code/crypto_encrypt_password.js');
+var token_sign_password = require.main.require('./encrypt_and_hash_code/token_sign_password.js');
 
 module.exports = function(sequelize, DataTypes) {
 	var partner = sequelize.define('partner', { 

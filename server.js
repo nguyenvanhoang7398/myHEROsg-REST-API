@@ -3,11 +3,15 @@ var express = require('express');
 var bcrypt = require('bcrypt');
 var _ = require('underscore');
 var bodyParser = require('body-parser');
+var nodemailer = require("nodemailer");
+
 var profiles_db = require('./profiles_db.js');
 var requests_db = require('./requests_db.js');
 var middleware_user = require('./middleware/middleware_user.js')(profiles_db);
 var middleware_admin = require('./middleware/middleware_admin.js')(profiles_db);
 var middleware_partner = require('./middleware/middleware_partner.js')(profiles_db);
+
+var send_verification_email = require('./emails/verify-email.js');
 
 var app = express();
 var PORT = process.env.PORT || 3000; //PORT 3000 for local host, process.env.PORT for public server 
@@ -91,7 +95,7 @@ app.get('/gps/:id', function(req, res) {
 	})
 });
 
-/** Create user account providing email and password
+/** Create user account providing email and password, then send verification email
  *
  * @author: Nguyen Van Hoang
  *
@@ -107,11 +111,41 @@ app.post('/users', function(req, res) {
     var body = _.pick(req.body, 'userName', 'email', 'phone', 'password');
 
     profiles_db.user.create(body).then(function(user) { // Create new user account
-        res.status(200).json(user.toPublicJSON());
+        var host = req.get('host');
+        send_verification_email(body.email, host).then(function() {
+            res.status(200).json(user.toPublicJSON());
+        }, function(e) {
+            res.status(400).json("{errors: Cannot send verification email}");
+        });
     }, function(e) {
         res.status(400).json(e.errors);
     });
+
+
 });
+
+/** Receive user verification from email
+ *
+ * @author: Nguyen Van Hoang
+ *
+ * URL: GET /verify
+ * 
+ * @res:
+ * _ body: Public JSON format of verified account
+ */
+app.get('/verify', function(req, res) {
+    var query = req.query;
+
+    if(query.hasOwnProperty('email') && query.email.length > 0) {
+        profiles_db.user.verifyEmail(query.email.toString()).then(function(user) {
+            user.update({verified: true}).then(function(user) {
+                res.status(200).json(user.toPublicJSON());
+            });
+        }, function(e) {
+            res.status(404).send("{errors: This account does not exist or has been verified}");
+        });
+    }
+})
 
 /** Login user account provding email and password
  *
@@ -142,9 +176,9 @@ app.post('/users/login', function(req, res) {
         res.header('Auth', tokenInstance.get('token')).json(userInstance.toPublicJSON()); // send valid token for login session by 'Auth' header
     }).catch (function(e) {
         console.log(e);
-        res.status(401).send();
+        res.status(401).send(e.errors);
     });
-})
+});
 
 /** Request a check up providing gpId, appointmentTime and description
  * 
@@ -258,6 +292,22 @@ app.post('/partners/login', function(req, res) {
         res.status(401).send();
     });
 })
+
+/** Show all available requests providing partner
+ *
+ * @author: Nguyen Van Hoang
+ * 
+ * URL: GET /partners/requests
+ *
+ * @query:
+ * _ status: status of the requests
+ * _ before: requests before a point of time
+ * _ after: requests after a point of time
+ *
+ * @ res:
+ * _ body: JSON format of all requests
+ * _ header: 'Auth': valid token for login session
+ */
 
 app.get('/partners/requests', middleware_partner.requireAuthentication, function(req, res) {
     var query = req.query;
