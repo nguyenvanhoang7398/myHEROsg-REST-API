@@ -3,10 +3,11 @@ var express = require('express');
 var bcrypt = require('bcrypt');
 var _ = require('underscore');
 var bodyParser = require('body-parser');
-var db = require('./db.js');
-var middleware_user = require('./middleware/middleware_user.js')(db);
-var middleware_admin = require('./middleware/middleware_admin.js')(db);
-var middleware_partner = require('./middleware/middleware_partner.js')(db);
+var profiles_db = require('./profiles_db.js');
+var requests_db = require('./requests_db.js');
+var middleware_user = require('./middleware/middleware_user.js')(profiles_db);
+var middleware_admin = require('./middleware/middleware_admin.js')(profiles_db);
+var middleware_partner = require('./middleware/middleware_partner.js')(profiles_db);
 
 var app = express();
 var PORT = process.env.PORT || 3000; //PORT 3000 for local host, process.env.PORT for public server 
@@ -56,7 +57,7 @@ app.get('/gps', function(req, res) {
 		};
 	}
 
-	db.gp.findAll({
+	profiles_db.gp.findAll({
 		where: where // find GP with 'where' object
 	}).then(function (filteredGPs) {
 		res.status(200).json(filteredGPs);
@@ -79,7 +80,7 @@ app.get('/gps', function(req, res) {
 app.get('/gps/:id', function(req, res) {
 	var gpId = parseInt(req.params.id, 10);
 
-	db.gp.findById(gpId).then(function(gp) {
+	profiles_db.gp.findbyId(gpId).then(function(gp) {
 		if(!!gp) {
 			res.status(200).json(gp);
 		} else {
@@ -105,7 +106,7 @@ app.get('/gps/:id', function(req, res) {
 app.post('/users', function(req, res) {
     var body = _.pick(req.body, 'userName', 'email', 'phone', 'password');
 
-    db.user.create(body).then(function(user) { // Create new user account
+    profiles_db.user.create(body).then(function(user) { // Create new user account
         res.status(200).json(user.toPublicJSON());
     }, function(e) {
         res.status(400).json(e.errors);
@@ -130,11 +131,11 @@ app.post('/users/login', function(req, res) {
     var body = _.pick(req.body, 'email', 'password');
     var userInstance;
 
-    db.user.authenticate(body).then(function(user) { // authenticate user account
+    profiles_db.user.authenticate(body).then(function(user) { // authenticate user account
         var token = user.generateToken('authentication');
         userInstance = user;
 
-        return db.token.create({
+        return profiles_db.token.create({
             token: token
         });
     }).then(function(tokenInstance) {
@@ -144,6 +145,44 @@ app.post('/users/login', function(req, res) {
         res.status(401).send();
     });
 })
+
+/** Request a check up providing gpId, appointmentTime and description
+ * 
+ * @author: Nguyen Van Hoang
+ *
+ * URL: POST /requests
+ *
+ * @query: gpId (required)
+ *
+ * @req:
+ * _ body: JSON format of 2 properties description (not required) and appointmentTime (required)
+ * _ header: 'Auth': valid token for login session  
+ * 
+ * @res:
+ * - body: JSON format of properties:
+ *   + userId: Id of the user
+ *   + gpId: Id of the GP
+ *   + description: description of the request
+ *   + status: status of the request (default is processing)
+ *   + appointmentTime: estimated appointment time to meet the GP
+ *   + createdAt and updatedAt
+ */
+app.post('/requests', middleware_user.requireAuthentication, function(req, res) {
+    var body = _.pick(req.body, 'description', 'appointmentTime');
+    var query = req.query;
+
+    if(query.hasOwnProperty('gpId') && query.gpId.length > 0) {
+        body.gpId = parseInt(query.gpId, 10);
+    }
+
+    body.userId = req.user.get('id');
+
+    requests_db.request.create(body).then(function(request) {
+        res.status(200).json(request.toPublicJSON());
+    }, function(e) {
+        res.status(400).json(e);
+    });
+});
 
 /** Logout user account
  *
@@ -179,7 +218,7 @@ app.delete('/users/login', middleware_user.requireAuthentication, function(req, 
 app.post('/partners', function(req, res) {
     var body = _.pick(req.body, 'partnerName', 'email', 'address', 'phone', 'password');
 
-    db.partner.create(body).then(function(partner) { // Create new partner account
+    profiles_db.partner.create(body).then(function(partner) { // Create new partner account
         res.status(200).json(partner.toPublicJSON());
     }, function(e) {
         res.status(400).json(e.errors);
@@ -204,11 +243,11 @@ app.post('/partners/login', function(req, res) {
     var body = _.pick(req.body, 'email', 'password');
     var partnerInstance;
 
-    db.partner.authenticate(body).then(function(partner) { // authenticate partner account
+    profiles_db.partner.authenticate(body).then(function(partner) { // authenticate partner account
         var token = partner.generateToken('authentication');
         partnerInstance = partner;
 
-        return db.token.create({
+        return profiles_db.token.create({
             token: token
         });
     }).then(function(tokenInstance) {
@@ -253,7 +292,7 @@ app.delete('/partners/login', middleware_partner.requireAuthentication, function
 app.post('/admins', function(req, res) {
     var body = _.pick(req.body, 'email', 'password');
 
-    db.admin.create(body).then(function(admin) { // Create new admin account
+    profiles_db.admin.create(body).then(function(admin) { // Create new admin account
         res.status(200).json(admin.toPublicJSON());
     }, function(e) {
         res.status(400).json(e.errors);
@@ -278,11 +317,11 @@ app.post('/admins/login', function(req, res) {
     var body = _.pick(req.body, 'email', 'password');
     var adminInstance;
 
-    db.admin.authenticate(body).then(function(admin) { // authenticate admin account
+    profiles_db.admin.authenticate(body).then(function(admin) { // authenticate admin account
         var token = admin.generateToken('authentication');
         adminInstance = admin;
 
-        return db.token.create({
+        return profiles_db.token.create({
             token: token
         });
     }).then(function(tokenInstance) {
@@ -325,7 +364,7 @@ app.delete('/admins/login', middleware_admin.requireAuthentication, function(req
  * _ body: JSON format of all users
  */
 app.get('/admins/users', middleware_admin.requireAuthentication, function(req, res) {
-    db.user.findAll().then(function(users) {
+    profiles_db.user.findAll().then(function(users) {
         var publicUsers = [];
         users.forEach(function(user) {
             publicUsers.push(user.toPublicJSON());
@@ -349,7 +388,7 @@ app.get('/admins/users', middleware_admin.requireAuthentication, function(req, r
  * _ body: JSON format of all partners
  */
 app.get('/admins/partners', middleware_admin.requireAuthentication, function(req, res) {
-    db.partner.findAll().then(function(partners) {
+    profiles_db.partner.findAll().then(function(partners) {
         var publicPartners = [];
         partners.forEach(function(partner) {
             publicPartners.push(partner.toPublicJSON());
@@ -360,8 +399,12 @@ app.get('/admins/partners', middleware_admin.requireAuthentication, function(req
     });
 });
 
-db.sequelize.sync({
+profiles_db.sequelize.sync({
     force: true
+}).then(function(){
+    requests_db.sequelize.sync({
+        force: true
+    });
 }).then(function() {
     app.listen(PORT, function() {
         console.log('Express listening on port ' + PORT + '!');
