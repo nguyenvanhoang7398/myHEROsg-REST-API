@@ -83,7 +83,6 @@ module.exports = function(sequelize, DataTypes) {
 							email: body.email
 						}
 					}).then(function(user) {
-						console.log("status: " + user.get('verified'));
 						if (!user || !(bcrypt.compareSync(body.password, user.get('password_hash'))) || user.get('verified') === false) { // reject if user not found or wrong password
 							return reject(errorAuth);
 						}

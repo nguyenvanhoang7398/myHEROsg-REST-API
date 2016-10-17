@@ -21,9 +21,9 @@ profiles_db.user = sequelize.import(__dirname + '/models/user.js');
 profiles_db.admin = sequelize.import(__dirname + '/models/admin.js');
 profiles_db.partner = sequelize.import(__dirname + '/models/partner.js');
 
-profiles_db.token = sequelize.import(__dirname + '/models/token.js');
-
 profiles_db.sequelize = sequelize;
 profiles_db.Sequelize = Sequelize;
+
+profiles_db.token = sequelize.import(__dirname + '/models/token.js');
 
 module.exports = profiles_db;
