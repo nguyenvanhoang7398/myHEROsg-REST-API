@@ -175,6 +175,7 @@ app.post('/requests', middleware_user.requireAuthentication, function(req, res) 
         body.gpId = parseInt(query.gpId, 10);
     }
 
+    body.appointmentTime = Date.parse(body.appointmentTime);
     body.userId = req.user.get('id');
 
     requests_db.request.create(body).then(function(request) {
@@ -258,6 +259,34 @@ app.post('/partners/login', function(req, res) {
     });
 })
 
+app.get('/partners/requests', middleware_partner.requireAuthentication, function(req, res) {
+    var query = req.query;
+    var where = {
+        gpId: req.partner.get('id'),
+        appointmentTime: {}
+    };
+
+    if (query.hasOwnProperty('status')) {
+        where.status = query.status;
+    };
+
+    if (query.hasOwnProperty('after') && query.after.length > 0) {
+        where.appointmentTime.$gte = Date.parse(query.after); 
+    }
+
+    if (query.hasOwnProperty('before') && query.before.length > 0) {
+        where.appointmentTime.$lte = Date.parse(query.before);
+    }
+
+    requests_db.request.findAll({
+        where: where
+    }).then(function(filteredRequests) {
+        res.status(200).json(filteredRequests);
+    }, function() {
+        res.status(500).send()
+    });
+});
+
 /** Logout partner account
  *
  * @author Nguyen Van Hoang
@@ -268,6 +297,7 @@ app.post('/partners/login', function(req, res) {
  * _ header:
  *   + 'Auth': valid token for login session
  */
+
 app.delete('/partners/login', middleware_partner.requireAuthentication, function(req, res) {
     req.token.destroy().then(function () { // Destroy current valid token for login session
         res.status(204).send();

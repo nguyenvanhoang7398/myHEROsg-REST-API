@@ -13,13 +13,15 @@ module.exports = function(sequelize, DataTypes) {
 		status: { // status of the request, can be processing, accepted, completed or canceled
 			type: DataTypes.STRING,
 			allowNull: false,
-			defaultValue: 'processing'
+			defaultValue: 'processing',
+			validate: {
+				equals: 'processing' || 'accepted' || 'completed' || 'canceled'
+			}
 		},
 		appointmentTime: { // estimated time to make the appointment with the GP in minutes
-			type: DataTypes.INTEGER,
+			type: DataTypes.DATE,
 			allowNull: false,
 			validate: {
-				isInt: true,
 				len: [1]
 			}
 		},
