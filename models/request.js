@@ -10,22 +10,30 @@ module.exports = function(sequelize, DataTypes) {
 			},
 			defaultValue: ""
 		}, 
+		GPResponse: { // description of the request that user wants to make
+			type: DataTypes.STRING,
+			allowNull: false,
+			validate: {
+				len: [0, 300]
+			},
+			defaultValue: ""
+		}, 
 		status: { // status of the request, can be processing, accepted, completed or canceled
 			type: DataTypes.STRING,
 			allowNull: false,
 			defaultValue: 'processing',
 			validate: {
-				equals: 'processing' || 'accepted' || 'completed' || 'canceled'
+				isIn: [['processing', 'accepted' ,'completed', 'cancelled']]
 			}
 		},
-		appointmentTime: { // estimated time to make the appointment with the GP in minutes
+		appointmentTime: { // estimated time to make the appointment with the partner in minutes
 			type: DataTypes.DATE,
 			allowNull: false,
 			validate: {
 				len: [1]
 			}
 		},
-		gpId: {
+		partnerId: {
 			type: DataTypes.INTEGER,
 			allowNull: false,
 			validate: {
@@ -45,9 +53,9 @@ module.exports = function(sequelize, DataTypes) {
 		instanceMethods: {
 			toPublicJSON: function() {
 				var json = this.toJSON();
-				return _.pick(json, 'id', 'userId', 'gpId', 
-				'description', 'status', 'appointmentTime', 
-				'createdAt', 'updatedAt'); // only choose 'id', 'userId', 'gpId', 'description', 'status', 'appointmentTime' properties to expose to public clients
+				return _.pick(json, 'id', 'userId', 'partnerId', 
+				'description', 'GPResponse' ,'status', 'appointmentTime', 
+				'createdAt', 'updatedAt'); // only choose 'id', 'userId', 'partnerId', 'description', 'status', 'appointmentTime' properties to expose to public clients
 			}
 		}
 	});
