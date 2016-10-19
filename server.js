@@ -375,7 +375,7 @@ app.patch('/request/:id', middleware_user.requireAuthentication, function(req, r
             id: requestId,
             userId: req.user.get('id'),
             status: {
-                $in: ['processing', 'completed']
+                $in: ['processing', 'accepted']
             }
         }
     }).then(function(request) {
@@ -604,7 +604,7 @@ app.patch('/partners/request/:id', middleware_partner.requireAuthentication, fun
             id: requestId,
             partnerId: req.partner.get('id'),
             status: {
-                $in: ['processing', 'completed']
+                $in: ['processing', 'accepted']
             }
         }
     }).then(function(request) {
