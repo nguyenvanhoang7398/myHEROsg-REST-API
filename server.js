@@ -223,6 +223,14 @@ app.get('/history', middleware_user.requireAuthentication, function(req, res) {
         requests: []
     }
 
+    if (query.hasOwnProperty('offset') && query.offset.length > 0) {
+        result.offset = parseInt(query.offset);
+    }
+
+    if (query.hasOwnProperty('limit') && parseInt(query.limit) < 30 && query.limit.length > 0) {
+        result.limit = parseInt(query.limit);
+    }
+
     if (query.hasOwnProperty('partnerId') && query.userId.length > 0) {
         where.partner = query.partnerId;
     }
@@ -240,26 +248,26 @@ app.get('/history', middleware_user.requireAuthentication, function(req, res) {
             where.appointmentTime.$lte = Date.parse(query.before);
         }
     }
-
-    requests_db.request.findAll({
-        where: where
+    
+    requests_db.request.findAndCountAll({
+        where: where,
+        limit: result.limit,
+        offset: result.offset
     }).then(function(filteredRequests) {
-        if (!filteredRequests) {
+        if(!filteredRequests) {
             res.status(404).json({
                 "errors": "Requests not found"
-            });
+            })
         } else {
-            filteredRequests.forEach(function(request) {
-                result.count++;
-                if ((filteredRequests.indexOf(request) >= (result.offset * result.limit)) && (filteredRequests.indexOf(request) < ((result.offset + 1) * result.limit))) {
-                    result.requests.push(request.toPublicJSON());
-                }
+            result.count = filteredRequests.count
+            filteredRequests.rows.forEach(function(request) {
+                result.requests.push(request);
             });
             res.status(200).json(result);
         }
     }, function() {
-        res.status(500).send()
-    });
+        res.status(500).send();
+    })
 });
 
 app.get('/me', middleware_user.requireAuthentication, function(req, res) {
@@ -536,25 +544,25 @@ app.get('/partners/requests', middleware_partner.requireAuthentication, function
         }
     }
 
-    requests_db.request.findAll({
-        where: where
+    requests_db.request.findAndCountAll({
+        where: where,
+        limit: result.limit,
+        offset: result.offset
     }).then(function(filteredRequests) {
-        if (!filteredRequests) {
+        if(!filteredRequests) {
             res.status(404).json({
                 "errors": "Requests not found"
-            });
+            })
         } else {
-            filteredRequests.forEach(function(request) {
-                result.count++;
-                if ((filteredRequests.indexOf(request) >= (result.offset * result.limit)) && (filteredRequests.indexOf(request) < ((result.offset + 1) * result.limit))) {
-                    result.requests.push(request.toPublicJSON());
-                }
+            result.count = filteredRequests.count
+            filteredRequests.rows.forEach(function(request) {
+                result.requests.push(request);
             });
             res.status(200).json(result);
         }
     }, function() {
-        res.status(500).send()
-    });
+        res.status(500).send();
+    })
 });
 
 app.get('/partners/requests/:id', middleware_partner.requireAuthentication, function(req, res) {
@@ -779,25 +787,25 @@ app.get('/admins/requests', middleware_admin.requireAuthentication, function(req
         }
     }
 
-    requests_db.request.findAll({
-        where: where
+    requests_db.request.findAndCountAll({
+        where: where,
+        limit: result.limit,
+        offset: result.offset
     }).then(function(filteredRequests) {
-        if (!filteredRequests) {
+        if(!filteredRequests) {
             res.status(404).json({
                 "errors": "Requests not found"
-            });
+            })
         } else {
-            filteredRequests.forEach(function(request) {
-                result.count++;
-                if ((filteredRequests.indexOf(request) >= (result.offset * result.limit)) && (filteredRequests.indexOf(request) < ((result.offset + 1) * result.limit))) {
-                    result.requests.push(request.toPublicJSON());
-                }
+            result.count = filteredRequests.count
+            filteredRequests.rows.forEach(function(request) {
+                result.requests.push(request);
             });
             res.status(200).json(result);
         }
     }, function() {
-        res.status(500).send()
-    });
+        res.status(500).send();
+    })
 });
 
 /** Logout admin account
