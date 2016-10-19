@@ -1,5 +1,12 @@
+var uniqid = require('uniqid');
+
 module.exports = function(sequelize, DataTypes) {
 	return sequelize.define('gp', {
+		uid: {
+			type: DataTypes.STRING,
+			primaryKey: true,
+			defaultValue: uniqid()
+		},
 		gpName: { // name of the GP
 			type: DataTypes.STRING,
 			allowNull: false,

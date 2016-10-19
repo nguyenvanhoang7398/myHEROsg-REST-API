@@ -1,7 +1,13 @@
+var uniqid = require('uniqid');
 var _ = require('underscore');
 
 module.exports = function(sequelize, DataTypes) {
 	return sequelize.define('request', {
+		uid: {
+			type: DataTypes.STRING,
+			primaryKey: true,
+			defaultValue: uniqid()
+		},
 		description: { // description of the request that user wants to make
 			type: DataTypes.STRING,
 			allowNull: false,
@@ -61,9 +67,9 @@ module.exports = function(sequelize, DataTypes) {
 		instanceMethods: {
 			toPublicJSON: function() {
 				var json = this.toJSON();
-				return _.pick(json, 'id', 'userId', 'partnerId', 
+				return _.pick(json, 'uid', 'userId', 'partnerId', 
 				'description', 'GPResponse' ,'status', 'appointmentTime', 'lastUpdater',
-				'createdAt', 'updatedAt'); // only choose 'id', 'userId', 'partnerId', 'description', 'status', 'appointmentTime' properties to expose to public clients
+				'createdAt', 'updatedAt'); // only choose 'uid', 'userId', 'partnerId', 'description', 'status', 'appointmentTime' properties to expose to public clients
 			}
 		}
 	});

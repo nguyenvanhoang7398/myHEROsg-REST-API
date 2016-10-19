@@ -15,7 +15,7 @@ module.exports = function(oldRequest, updatedRequest) {
 		pass: "myhero123!@#",
 		subject: "<Do not reply> A check-up request has been updated",
 		html: 
-		"<h1>Hello! There is a new update for request with ID " + updatedRequest.id + " </h1>"
+		"<h1>Hello! There is a new update for request with ID " + updatedRequest.uid + " </h1>"
 		+ "<p>Here is the previous request:</p>"
 
 		+ "<blockquote >"

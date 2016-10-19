@@ -4,9 +4,15 @@ var cryptojs = require('crypto-js');
 var jwt = require('jsonwebtoken');
 var crypto_encrypt_password = require.main.require('./encrypt_and_hash_code/crypto_encrypt_password.js');
 var token_sign_password = require.main.require('./encrypt_and_hash_code/token_sign_password.js');
+var uniqid = require('uniqid');
 
 module.exports = function(sequelize, DataTypes) {
 	var admin = sequelize.define('admin', { 
+		uid: {
+			type: DataTypes.STRING,
+			primaryKey: true,
+			defaultValue: uniqid()
+		},
 		email: { // email property of the admin
 			type: DataTypes.STRING,
 			allowNull: false,
@@ -93,7 +99,7 @@ module.exports = function(sequelize, DataTypes) {
 		instanceMethods: {
 			toPublicJSON: function() {
 				var json = this.toJSON();
-				return _.pick(json, 'id', 'email', 'createdAt', 'updatedAt'); // only choose 'id', 'email', 'createdAt', 'updatedAt' properties to expose to public clients
+				return _.pick(json, 'uid', 'email', 'createdAt', 'updatedAt'); // only choose 'uid', 'email', 'createdAt', 'updatedAt' properties to expose to public clients
 			},
 			generateToken: function (type) { // generate new token
 				if (!(_.isString(type))) {
@@ -102,7 +108,7 @@ module.exports = function(sequelize, DataTypes) {
 
 				try {
 					var stringData = JSON.stringify({ // stringify an object into JSON format
-						adminId: this.get('id'),
+						adminId: this.get('uid'),
 						type: type
 					})
 					var encryptedData = cryptojs.AES.encrypt(stringData, crypto_encrypt_password).toString(); // encrypt token

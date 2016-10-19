@@ -75,7 +75,7 @@ app.get('/gps', function(req, res) {
  *
  * @author: Nguyen Van Hoang
  *
- * URL: GET /gps/id:
+ * URL: GET /gps/:id
  *
  * @params id: id of the GP
  * 
@@ -196,7 +196,7 @@ app.post('/users/login', function(req, res) {
  * URL: GET /history
  *
  * @query:
- * _ userId: id of the user
+ * _ userId: uid of the user
  * _ status: status of the requests
  * _ before: requests before a point of time
  * _ after: requests after a point of time
@@ -214,7 +214,7 @@ app.post('/users/login', function(req, res) {
 app.get('/history', middleware_user.requireAuthentication, function(req, res) {
     var query = req.query;
     var where = {
-        userId: req.user.get('id')
+        userId: req.user.get('uid')
     };
     var result = {
         offset: 0,
@@ -271,7 +271,7 @@ app.get('/history', middleware_user.requireAuthentication, function(req, res) {
 });
 
 app.get('/me', middleware_user.requireAuthentication, function(req, res) {
-    var userId = req.user.get('id');
+    var userId = req.user.get('uid');
 
     profiles_db.user.findById(userId).then(function(user) {
         if (!user) {
@@ -298,8 +298,8 @@ app.get('/me', middleware_user.requireAuthentication, function(req, res) {
  * 
  * @res:
  * - body: JSON format of properties:
- *   + userId: Id of the user
- *   + partnerId: Id of the partner
+ *   + userId: uid of the user
+ *   + partnerId: uid of the partner
  *   + description: description of the request
  *   + status: status of the request (default is processing)
  *   + appointmentTime: estimated appointment time to meet the partner
@@ -315,7 +315,7 @@ app.post('/requests', middleware_user.requireAuthentication, function(req, res) 
             });
         } else {
             body.appointmentTime = Date.parse(body.appointmentTime);
-            body.userId = req.user.get('id');
+            body.userId = req.user.get('uid');
 
             requests_db.request.create(body).then(function(request) {
                 res.status(200).json(request.toPublicJSON());
@@ -333,8 +333,8 @@ app.get('/requests/:id', middleware_user.requireAuthentication, function(req, re
 
     requests_db.request.findOne({
         where: {
-            id: requestId,
-            userId: req.user.get('id')
+            uid: requestId,
+            userId: req.user.get('uid')
         }
     }).then(function(request) {
         if (!!request) {
@@ -372,8 +372,8 @@ app.patch('/request/:id', middleware_user.requireAuthentication, function(req, r
 
     requests_db.request.findOne({
         where: {
-            id: requestId,
-            userId: req.user.get('id'),
+            uid: requestId,
+            userId: req.user.get('uid'),
             status: {
                 $in: ['processing', 'accepted']
             }
@@ -499,7 +499,7 @@ app.post('/partners/login', function(req, res) {
  * URL: GET /partners/requests
  *
  * @query:
- * _ userId: id of the user
+ * _ userId: uid of the user
  * _ status: status of the requests
  * _ before: requests before a point of time
  * _ after: requests after a point of time
@@ -517,7 +517,7 @@ app.post('/partners/login', function(req, res) {
 app.get('/partners/requests', middleware_partner.requireAuthentication, function(req, res) {
     var query = req.query;
     var where = {
-        partnerId: req.partner.get('id')
+        partnerId: req.partner.get('uid')
     };
     var result = {
         offset: 0,
@@ -570,8 +570,8 @@ app.get('/partners/requests/:id', middleware_partner.requireAuthentication, func
 
     requests_db.request.findOne({
         where: {
-            id: requestId,
-            partnerId: req.partner.get('id')
+            uid: requestId,
+            partnerId: req.partner.get('uid')
         }
     }).then(function(request) {
         if (!!request) {
@@ -601,8 +601,8 @@ app.patch('/partners/request/:id', middleware_partner.requireAuthentication, fun
 
     requests_db.request.findOne({
         where: {
-            id: requestId,
-            partnerId: req.partner.get('id'),
+            uid: requestId,
+            partnerId: req.partner.get('uid'),
             status: {
                 $in: ['processing', 'accepted']
             }
@@ -730,8 +730,8 @@ app.post('/admins/login', function(req, res) {
  * URL: GET /partners/requests
  *
  * @query:
- * _ partnerId: id of the partner
- * _ userId: id of the user
+ * _ partnerId: uid of the partner
+ * _ userId: uid of the user
  * _ status: status of the requests
  * _ before: requests before a point of time
  * _ after: requests after a point of time
@@ -808,6 +808,104 @@ app.get('/admins/requests', middleware_admin.requireAuthentication, function(req
     })
 });
 
+/** Show all registered users
+ * @author Nguyen Van Hoang
+ *
+ * URL: GET /admins/admins
+ * 
+ * @req:
+ * _ header:
+ *   + 'Auth': valid token for login session
+ * 
+ * @res:
+ * _ body: JSON format of all users
+ */
+app.get('/admins/users', middleware_admin.requireAuthentication, function(req, res) {
+    var query = req.query;
+    var result = {
+        offset: 0,
+        limit: 5,
+        count: 0,
+        users: []
+    }
+
+    if (query.hasOwnProperty('offset') && query.offset.length > 0) {
+        result.offset = parseInt(query.offset);
+    }
+
+    if (query.hasOwnProperty('limit') && parseInt(query.limit) < 30 && query.limit.length > 0) {
+        result.limit = parseInt(query.limit);
+    }
+
+    profiles_db.user.findAndCountAll({
+        limit: result.limit,
+        offset: result.offset
+    }).then(function(filteredUsers) {
+        if(!filteredUsers) {
+            res.status(404).json({
+                "errors": "Users not found"
+            })
+        } else {
+            result.count = filteredUsers.count
+            filteredUsers.rows.forEach(function(user) {
+                result.users.push(user.toPublicJSON());
+            });
+            res.status(200).json(result);
+        }
+    }, function() {
+        res.status(500).send();
+    })
+});
+
+/** Show all registered partners
+ * @author Nguyen Van Hoang
+ *
+ * URL: GET /admins/partners
+ * 
+ * @req:
+ * _ header:
+ *   + 'Auth': valid token for login session
+ * 
+ * @res:
+ * _ body: JSON format of all partners
+ */
+app.get('/admins/partners', middleware_admin.requireAuthentication, function(req, res) {
+    var query = req.query;
+    var result = {
+        offset: 0,
+        limit: 5,
+        count: 0,
+        partners: []
+    }
+
+    if (query.hasOwnProperty('offset') && query.offset.length > 0) {
+        result.offset = parseInt(query.offset);
+    }
+
+    if (query.hasOwnProperty('limit') && parseInt(query.limit) < 30 && query.limit.length > 0) {
+        result.limit = parseInt(query.limit);
+    }
+
+    profiles_db.partner.findAndCountAll({
+        limit: result.limit,
+        offset: result.offset
+    }).then(function(filteredPartners) {
+        if(!filteredPartners) {
+            res.status(404).json({
+                "errors": "Partners not found"
+            })
+        } else {
+            result.count = filteredPartners.count
+            filteredPartners.rows.forEach(function(partner) {
+                result.partners.push(partner.toPublicJSON());
+            });
+            res.status(200).json(result);
+        }
+    }, function() {
+        res.status(500).send();
+    })
+});
+
 /** Logout admin account
  *
  * @author Nguyen Van Hoang
@@ -825,54 +923,6 @@ app.delete('/admins/login', middleware_admin.requireAuthentication, function(req
         console.log(e);
         res.status(500).send();
     })
-});
-
-/** Show all registered users
- * @author Nguyen Van Hoang
- *
- * URL: GET /admins/admins
- * 
- * @req:
- * _ header:
- *   + 'Auth': valid token for login session
- * 
- * @res:
- * _ body: JSON format of all users
- */
-app.get('/admins/users', middleware_admin.requireAuthentication, function(req, res) {
-    profiles_db.user.findAll().then(function(users) {
-        var publicUsers = [];
-        users.forEach(function(user) {
-            publicUsers.push(user.toPublicJSON());
-        })
-        res.status(200).json(publicUsers);
-    }, function() {
-        res.status(500).send();
-    });
-});
-
-/** Show all registered partners
- * @author Nguyen Van Hoang
- *
- * URL: GET /admins/partners
- * 
- * @req:
- * _ header:
- *   + 'Auth': valid token for login session
- * 
- * @res:
- * _ body: JSON format of all partners
- */
-app.get('/admins/partners', middleware_admin.requireAuthentication, function(req, res) {
-    profiles_db.partner.findAll().then(function(partners) {
-        var publicPartners = [];
-        partners.forEach(function(partner) {
-            publicPartners.push(partner.toPublicJSON());
-        })
-        res.status(200).json(publicPartners);
-    }, function() {
-        res.status(500).send();
-    });
 });
 
 profiles_db.sequelize.sync({

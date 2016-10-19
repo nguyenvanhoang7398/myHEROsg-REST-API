@@ -5,12 +5,18 @@ var jwt = require('jsonwebtoken');
 var crypto_encrypt_password = require.main.require('./encrypt_and_hash_code/crypto_encrypt_password.js');
 var token_sign_password = require.main.require('./encrypt_and_hash_code/token_sign_password.js');
 var encrypt_email_code = require.main.require('./encrypt_and_hash_code/email_verification_password.js');
+var uniqid = require('uniqid');
 
 var Crypt = require('cryptr');
 crypt = new Crypt(encrypt_email_code);
 
 module.exports = function(sequelize, DataTypes) {
 	var user = sequelize.define('user', { 
+		uid: {
+			type: DataTypes.STRING,
+			primaryKey: true,
+			defaultValue: uniqid()
+		},
 		firstName: {
 			type: DataTypes.STRING,
 			allowNull: false,
@@ -123,7 +129,7 @@ module.exports = function(sequelize, DataTypes) {
 					}
 				})
 			},
-			verifyEmail: function(encrypted_email) { // verify email of the user given a string of encrypted email at the end of id
+			verifyEmail: function(encrypted_email) { // verify email of the user given a string of encrypted email
 				var errorsVerify = { // Verifying error message
 					errors: "Cannot verify this email"
 				}
@@ -152,7 +158,7 @@ module.exports = function(sequelize, DataTypes) {
 		instanceMethods: {
 			toPublicJSON: function() {
 				var json = this.toJSON();
-				return _.pick(json, 'id', 'firstName', 'lastName', 'email', 'phone', 'createdAt', 'updatedAt', 'verified'); // only choose 'id', 'email', 'createdAt', 'updatedAt' properties to expose to public clients
+				return _.pick(json, 'uid', 'firstName', 'lastName', 'email', 'phone', 'createdAt', 'updatedAt', 'verified'); // only choose 'uid', 'email', 'createdAt', 'updatedAt' properties to expose to public clients
 			},
 			generateToken: function (type) { // generate new token
 				if (!(_.isString(type))) {
@@ -161,7 +167,7 @@ module.exports = function(sequelize, DataTypes) {
 
 				try {
 					var stringData = JSON.stringify({ // stringify an object into JSON format
-						userId: this.get('id'),
+						userId: this.get('uid'),
 						type: type
 					})
 					var encryptedData = cryptojs.AES.encrypt(stringData, crypto_encrypt_password).toString(); // encrypt token
