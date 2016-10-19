@@ -9,7 +9,7 @@ crypt = new Crypt(encrypt_email_code);
 
 module.exports = function(email, host) {
 	return new Promise(function(resolve, reject) {
-		console.log("email: " + email);
+		console.log("Send verification email to: " + email);
 		var encryptedEmail = crypt.encrypt(email); // encrypt email
 
 		var link = "http://" + host + "/verify?email=" + encryptedEmail; // verifying link sent to user
@@ -21,8 +21,6 @@ module.exports = function(email, host) {
 			html: email_format.html
 		}
 
-		console.log(email_format.user);
-		console.log(email_format.pass);
 		var smtpTransport = nodemailer.createTransport("SMTP", {
 			service: email_format.service,
 			auth: {

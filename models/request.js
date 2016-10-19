@@ -48,13 +48,21 @@ module.exports = function(sequelize, DataTypes) {
 				isInt: true,
 				len: [1]
 			}
+		},
+		lastUpdater: {
+			type: DataTypes.STRING,
+			allowNull: false,
+			defaultValue: "creator",
+			validate: {
+				len: [1, 100]
+			}
 		}
 	}, {
 		instanceMethods: {
 			toPublicJSON: function() {
 				var json = this.toJSON();
 				return _.pick(json, 'id', 'userId', 'partnerId', 
-				'description', 'GPResponse' ,'status', 'appointmentTime', 
+				'description', 'GPResponse' ,'status', 'appointmentTime', 'lastUpdater',
 				'createdAt', 'updatedAt'); // only choose 'id', 'userId', 'partnerId', 'description', 'status', 'appointmentTime' properties to expose to public clients
 			}
 		}

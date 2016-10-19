@@ -11,7 +11,14 @@ crypt = new Crypt(encrypt_email_code);
 
 module.exports = function(sequelize, DataTypes) {
 	var user = sequelize.define('user', { 
-		userName: {
+		firstName: {
+			type: DataTypes.STRING,
+			allowNull: false,
+			validate: {
+				len: [1, 100]
+			}
+		},
+		lastName: {
 			type: DataTypes.STRING,
 			allowNull: false,
 			validate: {
@@ -145,7 +152,7 @@ module.exports = function(sequelize, DataTypes) {
 		instanceMethods: {
 			toPublicJSON: function() {
 				var json = this.toJSON();
-				return _.pick(json, 'id', 'userName', 'email', 'phone', 'createdAt', 'updatedAt', 'verified'); // only choose 'id', 'email', 'createdAt', 'updatedAt' properties to expose to public clients
+				return _.pick(json, 'id', 'firstName', 'lastName', 'email', 'phone', 'createdAt', 'updatedAt', 'verified'); // only choose 'id', 'email', 'createdAt', 'updatedAt' properties to expose to public clients
 			},
 			generateToken: function (type) { // generate new token
 				if (!(_.isString(type))) {

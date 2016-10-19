@@ -11,7 +11,8 @@ var middleware_user = require('./middleware/middleware_user.js')(profiles_db);
 var middleware_admin = require('./middleware/middleware_admin.js')(profiles_db);
 var middleware_partner = require('./middleware/middleware_partner.js')(profiles_db);
 
-var send_verification_email = require('./emails/verify-email.js');
+var send_verification_email = require('./emails/verify_email.js');
+var send_update_email = require('./emails/inform_update.js');
 
 var app = express();
 var PORT = process.env.PORT || 3000; //PORT 3000 for local host, process.env.PORT for public server 
@@ -110,7 +111,7 @@ app.get('/gps/:id', function(req, res) {
  * - body: Pulic JSON format of created account
  */
 app.post('/users', function(req, res) {
-    var body = _.pick(req.body, 'userName', 'email', 'phone', 'password');
+    var body = _.pick(req.body, 'firstName', 'lastName', 'email', 'phone', 'password');
 
     profiles_db.user.create(body).then(function(user) { // Create new user account
         var host = req.get('host');
@@ -185,6 +186,95 @@ app.post('/users/login', function(req, res) {
     }).catch(function(e) {
         console.log(e);
         res.status(401).send(e.errors);
+    });
+});
+
+/** Show all available requests providing user
+ *
+ * @author: Nguyen Van Hoang
+ * 
+ * URL: GET /history
+ *
+ * @query:
+ * _ userId: id of the user
+ * _ status: status of the requests
+ * _ before: requests before a point of time
+ * _ after: requests after a point of time
+ * _ offset: Offset the list of returned results by this amount. Default is zero.
+ * _ limit: Number of items to retrieve. Default is 5, maximum is 30.
+ *
+ * @ res:
+ * _ body: 
+ *   + offset
+ *   + limit
+ *   + count: total number of requests
+ *   + requests: JSON format of all requests
+ * _ header: 'Auth': valid token for login session
+ */
+app.get('/history', middleware_user.requireAuthentication, function(req, res) {
+    var query = req.query;
+    var where = {
+        userId: req.user.get('id')
+    };
+    var result = {
+        offset: 0,
+        limit: 5,
+        count: 0,
+        requests: []
+    }
+
+    if (query.hasOwnProperty('partnerId') && query.userId.length > 0) {
+        where.partner = query.partnerId;
+    }
+
+    if (query.hasOwnProperty('status')) {
+        where.status = query.status;
+    };
+
+    if ((query.hasOwnProperty('after') && query.after.length > 0) || (query.hasOwnProperty('before') && query.before.length > 0)) {
+        where.appointmentTime = {};
+        if (query.hasOwnProperty('after')) {
+            where.appointmentTime.$gte = Date.parse(query.after);
+        }
+        if (query.hasOwnProperty('before')) {
+            where.appointmentTime.$lte = Date.parse(query.before);
+        }
+    }
+
+    requests_db.request.findAll({
+        where: where
+    }).then(function(filteredRequests) {
+        if (!filteredRequests) {
+            res.status(404).json({
+                "errors": "Requests not found"
+            });
+        } else {
+            filteredRequests.forEach(function(request) {
+                result.count++;
+                if ((filteredRequests.indexOf(request) >= (result.offset * result.limit)) && (filteredRequests.indexOf(request) < ((result.offset + 1) * result.limit))) {
+                    result.requests.push(request.toPublicJSON());
+                }
+            });
+            res.status(200).json(result);
+        }
+    }, function() {
+        res.status(500).send()
+    });
+});
+
+app.get('/me', middleware_user.requireAuthentication, function(req, res) {
+    var userId = req.user.get('id');
+
+    profiles_db.user.findById(userId).then(function(user) {
+        if (!user) {
+            res.status(404).json({
+                "errors": "User not found"
+            });
+        } else {
+            res.status(200).json(user.toPublicJSON());
+        }
+    }, function() {
+        res.status(500).send();
     });
 });
 
@@ -282,13 +372,39 @@ app.patch('/request/:id', middleware_user.requireAuthentication, function(req, r
         }
     }).then(function(request) {
         if (!request) {
-            res.status(404).json({"errors" : "Request not found or expired"});
+            res.status(404).json({
+                "errors": "Request not found or expired"
+            });
         } else {
-            request.update(attributes).then(function(request) {
-                res.json(request.toPublicJSON());
+            var oldRequest = _.clone(request.toPublicJSON());
+            var partnerEmail;
+
+            profiles_db.partner.findById(request.partnerId).then(function(partner) {
+                partnerEmail = partner.get('email');
+            })
+
+            attributes.lastUpdater = req.user.get('firstName') + " " + req.user.get('lastName');
+
+            request.update(attributes).then(function(updatedRequest) {
+                send_update_email(oldRequest, updatedRequest.toPublicJSON(), req.user.get('email')).then(function() {
+                    console.log('partner email ' + partnerEmail);
+                    send_update_email(oldRequest, updatedRequest.toPublicJSON(), partnerEmail).then(function() {}, function() {
+                        console.log("Update email cannot be sent to GPPartner");
+                        res.status(400).json({
+                            "errors": "Update email cannot be sent to GPPartner"
+                        });
+                    });
+                }, function() {
+                    console.log("Update email cannot be sent to user");
+                    res.status(400).json({
+                        "errors": "Update email cannot be sent to user"
+                    })
+                })
             }, function(e) {
                 console.log(e);
-                res.status(400).json({"errors": "Bad data provided"});
+                res.status(400).json({
+                    "errors": "Bad data provided"
+                });
             })
         }
     })
@@ -379,38 +495,63 @@ app.post('/partners/login', function(req, res) {
  * _ status: status of the requests
  * _ before: requests before a point of time
  * _ after: requests after a point of time
+ * _ offset: Offset the list of returned results by this amount. Default is zero.
+ * _ limit: Number of items to retrieve. Default is 5, maximum is 30.
  *
  * @ res:
- * _ body: JSON format of all requests
+ * _ body: 
+ *   + offset
+ *   + limit
+ *   + count: total number of requests
+ *   + requests: JSON format of all requests
  * _ header: 'Auth': valid token for login session
  */
 app.get('/partners/requests', middleware_partner.requireAuthentication, function(req, res) {
     var query = req.query;
     var where = {
-        partnerId: req.partner.get('id'),
-        appointmentTime: {}
+        partnerId: req.partner.get('id')
     };
+    var result = {
+        offset: 0,
+        limit: 5,
+        count: 0,
+        requests: []
+    }
 
     if (query.hasOwnProperty('userId') && query.userId.length > 0) {
-        where.userId =  query.userId;
+        where.userId = query.userId;
     }
 
     if (query.hasOwnProperty('status')) {
         where.status = query.status;
     };
 
-    if (query.hasOwnProperty('after') && query.after.length > 0) {
-        where.appointmentTime.$gte = Date.parse(query.after);
-    }
-
-    if (query.hasOwnProperty('before') && query.before.length > 0) {
-        where.appointmentTime.$lte = Date.parse(query.before);
+    if ((query.hasOwnProperty('after') && query.after.length > 0) || (query.hasOwnProperty('before') && query.before.length > 0)) {
+        where.appointmentTime = {};
+        if (query.hasOwnProperty('after')) {
+            where.appointmentTime.$gte = Date.parse(query.after);
+        }
+        if (query.hasOwnProperty('before')) {
+            where.appointmentTime.$lte = Date.parse(query.before);
+        }
     }
 
     requests_db.request.findAll({
         where: where
     }).then(function(filteredRequests) {
-        res.status(200).json(filteredRequests);
+        if (!filteredRequests) {
+            res.status(404).json({
+                "errors": "Requests not found"
+            });
+        } else {
+            filteredRequests.forEach(function(request) {
+                result.count++;
+                if ((filteredRequests.indexOf(request) >= (result.offset * result.limit)) && (filteredRequests.indexOf(request) < ((result.offset + 1) * result.limit))) {
+                    result.requests.push(request.toPublicJSON());
+                }
+            });
+            res.status(200).json(result);
+        }
     }, function() {
         res.status(500).send()
     });
@@ -455,18 +596,45 @@ app.patch('/partners/request/:id', middleware_partner.requireAuthentication, fun
             id: requestId,
             partnerId: req.partner.get('id'),
             status: {
-                $in: ['processing', 'accepted']
+                $in: ['processing', 'completed']
             }
         }
     }).then(function(request) {
         if (!request) {
-            res.status(404).json({"errors" : "Request not found or expired"});
+            res.status(404).json({
+                "errors": "Request not found or expired"
+            });
         } else {
-            request.update(attributes).then(function(request) {
-                res.json(request.toPublicJSON());
+            var oldRequest = _.clone(request.toPublicJSON());
+            var userEmail;
+
+            profiles_db.user.findById(request.userId).then(function(user) {
+                userEmail = user.get('email');
+            })
+
+            attributes.lastUpdater = req.partner.get('partnerName');
+
+            request.update(attributes).then(function(updatedRequest) {
+                send_update_email(oldRequest, updatedRequest.toPublicJSON(), userEmail).then(function() {
+                    send_update_email(oldRequest, updatedRequest.toPublicJSON(), req.partner.get('email')).then(function() {
+                        res.status(200).json(request.toPublicJSON());
+                    }, function() {
+                        console.log("Update email cannot be sent to GPPartner");
+                        res.status(400).json({
+                            "errors": "Update email cannot be sent to GPPartner"
+                        });
+                    });
+                }, function() {
+                    console.log("Update email cannot be sent to user");
+                    res.status(400).json({
+                        "errors": "Update email cannot be sent to user"
+                    })
+                })
             }, function(e) {
                 console.log(e);
-                res.status(400).json({"errors": "Bad data provided"});
+                res.status(400).json({
+                    "errors": "Bad data provided"
+                });
             })
         }
     })
@@ -559,41 +727,74 @@ app.post('/admins/login', function(req, res) {
  * _ status: status of the requests
  * _ before: requests before a point of time
  * _ after: requests after a point of time
+ * _ offset: Offset the list of returned results by this amount. Default is zero.
+ * _ limit: Number of items to retrieve. Default is 5, maximum is 30.
  *
  * @ res:
- * _ body: JSON format of all requests
+ * _ body: 
+ *   + offset
+ *   + limit
+ *   + count: total number of requests
+ *   + requests: JSON format of all requests
  * _ header: 'Auth': valid token for login session
  */
 app.get('/admins/requests', middleware_admin.requireAuthentication, function(req, res) {
     var query = req.query;
-    var where = {
-        appointmentTime: {}
-    };
+    var where = {};
+    var result = {
+        offset: 0,
+        limit: 5,
+        count: 0,
+        requests: []
+    }
+
+    if (query.hasOwnProperty('offset') && query.offset.length > 0) {
+        result.offset = parseInt(query.offset);
+    }
+
+    if (query.hasOwnProperty('limit') && parseInt(query.limit) < 30 && query.limit.length > 0) {
+        result.limit = parseInt(query.limit);
+    }
 
     if (query.hasOwnProperty('partnerId') && query.partnerId.length > 0) {
-        where.partnerId = partnerId; 
+        where.partnerId = partnerId;
     }
 
     if (query.hasOwnProperty('userId') && query.userId.length > 0) {
-        where.userId =  query.userId;
+        where.userId = query.userId;
     }
 
     if (query.hasOwnProperty('status')) {
         where.status = query.status;
     };
 
-    if (query.hasOwnProperty('after') && query.after.length > 0) {
-        where.appointmentTime.$gte = Date.parse(query.after);
-    }
 
-    if (query.hasOwnProperty('before') && query.before.length > 0) {
-        where.appointmentTime.$lte = Date.parse(query.before);
+    if ((query.hasOwnProperty('after') && query.after.length > 0) || (query.hasOwnProperty('before') && query.before.length > 0)) {
+        where.appointmentTime = {};
+        if (query.hasOwnProperty('after')) {
+            where.appointmentTime.$gte = Date.parse(query.after);
+        }
+        if (query.hasOwnProperty('before')) {
+            where.appointmentTime.$lte = Date.parse(query.before);
+        }
     }
 
     requests_db.request.findAll({
         where: where
     }).then(function(filteredRequests) {
-        res.status(200).json(filteredRequests);
+        if (!filteredRequests) {
+            res.status(404).json({
+                "errors": "Requests not found"
+            });
+        } else {
+            filteredRequests.forEach(function(request) {
+                result.count++;
+                if ((filteredRequests.indexOf(request) >= (result.offset * result.limit)) && (filteredRequests.indexOf(request) < ((result.offset + 1) * result.limit))) {
+                    result.requests.push(request.toPublicJSON());
+                }
+            });
+            res.status(200).json(result);
+        }
     }, function() {
         res.status(500).send()
     });
