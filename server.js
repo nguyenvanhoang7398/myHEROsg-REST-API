@@ -83,7 +83,7 @@ app.get('/gps', function(req, res) {
  * _ body: JSON format of the GP information
  */
 app.get('/gps/:id', function(req, res) {
-    var gpId = parseInt(req.params.id, 10);
+    var gpId = req.params.id;
 
     profiles_db.gp.findbyId(gpId).then(function(gp) {
         if (!!gp) {
@@ -329,7 +329,7 @@ app.post('/requests', middleware_user.requireAuthentication, function(req, res) 
 });
 
 app.get('/requests/:id', middleware_user.requireAuthentication, function(req, res) {
-    var requestId = parseInt(req.params.id, 10);
+    var requestId = req.params.id;
 
     requests_db.request.findOne({
         where: {
@@ -350,7 +350,7 @@ app.get('/requests/:id', middleware_user.requireAuthentication, function(req, re
 });
 
 app.patch('/request/:id', middleware_user.requireAuthentication, function(req, res) {
-    var requestId = parseInt(req.params.id, 10);
+    var requestId = req.params.id;
     var body = _.pick(req.body, 'partnerId', 'description', 'appointmentTime', 'status');
     var attributes = {};
 
@@ -396,7 +396,9 @@ app.patch('/request/:id', middleware_user.requireAuthentication, function(req, r
             request.update(attributes).then(function(updatedRequest) {
                 send_update_email(oldRequest, updatedRequest.toPublicJSON(), req.user.get('email')).then(function() {
                     console.log('partner email ' + partnerEmail);
-                    send_update_email(oldRequest, updatedRequest.toPublicJSON(), partnerEmail).then(function() {}, function() {
+                    send_update_email(oldRequest, updatedRequest.toPublicJSON(), partnerEmail).then(function() {
+                        res.status(200).json(request.toPublicJSON());
+                    }, function() {
                         console.log("Update email cannot be sent to GPPartner");
                         res.status(400).json({
                             "errors": "Update email cannot be sent to GPPartner"
@@ -566,7 +568,7 @@ app.get('/partners/requests', middleware_partner.requireAuthentication, function
 });
 
 app.get('/partners/requests/:id', middleware_partner.requireAuthentication, function(req, res) {
-    var requestId = parseInt(req.params.id, 10);
+    var requestId = req.params.id;
 
     requests_db.request.findOne({
         where: {
@@ -587,7 +589,7 @@ app.get('/partners/requests/:id', middleware_partner.requireAuthentication, func
 });
 
 app.patch('/partners/request/:id', middleware_partner.requireAuthentication, function(req, res) {
-    var requestId = parseInt(req.params.id, 10);
+    var requestId = req.params.id;
     var body = _.pick(req.body, 'GPResponse', 'appointmentTime', 'status');
     var attributes = {};
 

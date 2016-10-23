@@ -40,19 +40,17 @@ module.exports = function(sequelize, DataTypes) {
 			}
 		},
 		partnerId: {
-			type: DataTypes.INTEGER,
+			type: DataTypes.STRING,
 			allowNull: false,
 			validate: {
-				isInt: true,
-				len: [1]
+				len: [1, 50]
 			}
 		},
 		userId: {
-			type: DataTypes.INTEGER,
+			type: DataTypes.STRING,
 			allowNull: false,
 			validate: {
-				isInt: true,
-				len: [1]
+				len: [1, 50]
 			}
 		},
 		lastUpdater: {
