@@ -2,7 +2,6 @@ var _ = require('underscore');
 
 var profiles_db = require.main.require('./profiles_db.js');
 var requests_db = require.main.require('./requests_db.js');
-var middleware_user = require.main.require('./middleware/middleware_user.js')(profiles_db);
 
 var send_verification_email = require.main.require('./emails/verify_email.js');
 var send_update_email = require.main.require('./emails/inform_update.js');
