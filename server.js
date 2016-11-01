@@ -1,5 +1,6 @@
 // npm modules
 var express = require('express');
+var router = express.Router();
 var bcrypt = require('bcrypt');
 var _ = require('underscore');
 var bodyParser = require('body-parser');
@@ -18,12 +19,13 @@ var app = express();
 var PORT = process.env.PORT || 3000; //PORT 3000 for local host, process.env.PORT for public server 
 
 app.use(bodyParser.json());
+app.use('/api', router);
 
 // http methods
 
 // Root API
 // GET /
-app.get('/', function(req, res) {
+router.get('/', function(req, res) {
     res.send('myHEROsg REST API ROOT');
 })
 
@@ -40,7 +42,7 @@ app.get('/', function(req, res) {
  * @res: 
  * _ body: JSON format of filtered GPs
  */
-app.get('/gps', function(req, res) {
+router.get('/gps', function(req, res) {
     var query = req.query;
     var where = {}; // create 'where' object to find GP
 
@@ -82,7 +84,7 @@ app.get('/gps', function(req, res) {
  * @res: 
  * _ body: JSON format of the GP information
  */
-app.get('/gps/:id', function(req, res) {
+router.get('/gps/:id', function(req, res) {
     var gpId = req.params.id;
 
     profiles_db.gp.findbyId(gpId).then(function(gp) {
@@ -110,7 +112,7 @@ app.get('/gps/:id', function(req, res) {
  * @res: 
  * - body: Pulic JSON format of created account
  */
-app.post('/users', function(req, res) {
+router.post('/users', function(req, res) {
     var body = _.pick(req.body, 'firstName', 'lastName', 'email', 'phone', 'password');
 
     profiles_db.user.create(body).then(function(user) { // Create new user account
@@ -138,7 +140,7 @@ app.post('/users', function(req, res) {
  * @res:
  * _ body: Public JSON format of verified account
  */
-app.get('/verify', function(req, res) {
+router.get('/verify', function(req, res) {
     var query = req.query;
 
     if (query.hasOwnProperty('email') && query.email.length > 0) {
@@ -170,7 +172,7 @@ app.get('/verify', function(req, res) {
  * _ header:
  *   + 'Auth': valid token for login session
  */
-app.post('/users/login', function(req, res) {
+router.post('/users/login', function(req, res) {
     var body = _.pick(req.body, 'email', 'password');
     var userInstance;
 
@@ -211,7 +213,7 @@ app.post('/users/login', function(req, res) {
  *   + requests: JSON format of all requests
  * _ header: 'Auth': valid token for login session
  */
-app.get('/history', middleware_user.requireAuthentication, function(req, res) {
+router.get('/history', middleware_user.requireAuthentication, function(req, res) {
     var query = req.query;
     var where = {
         userId: req.user.get('uid')
@@ -259,7 +261,7 @@ app.get('/history', middleware_user.requireAuthentication, function(req, res) {
                 "errors": "Requests not found"
             })
         } else {
-            result.count = filteredRequests.count
+            result.count = filteredRequests.count;
             filteredRequests.rows.forEach(function(request) {
                 result.requests.push(request);
             });
@@ -270,7 +272,7 @@ app.get('/history', middleware_user.requireAuthentication, function(req, res) {
     })
 });
 
-app.get('/me', middleware_user.requireAuthentication, function(req, res) {
+router.get('/me', middleware_user.requireAuthentication, function(req, res) {
     var userId = req.user.get('uid');
 
     profiles_db.user.findById(userId).then(function(user) {
@@ -305,7 +307,7 @@ app.get('/me', middleware_user.requireAuthentication, function(req, res) {
  *   + appointmentTime: estimated appointment time to meet the partner
  *   + createdAt and updatedAt
  */
-app.post('/requests', middleware_user.requireAuthentication, function(req, res) {
+router.post('/requests', middleware_user.requireAuthentication, function(req, res) {
     var body = _.pick(req.body, 'partnerId', 'description', 'appointmentTime');
 
     profiles_db.partner.findById(body.partnerId).then(function(partner) {
@@ -328,7 +330,7 @@ app.post('/requests', middleware_user.requireAuthentication, function(req, res) 
     });
 });
 
-app.get('/requests/:id', middleware_user.requireAuthentication, function(req, res) {
+router.get('/requests/:id', middleware_user.requireAuthentication, function(req, res) {
     var requestId = req.params.id;
 
     requests_db.request.findOne({
@@ -349,7 +351,7 @@ app.get('/requests/:id', middleware_user.requireAuthentication, function(req, re
     });
 });
 
-app.patch('/request/:id', middleware_user.requireAuthentication, function(req, res) {
+router.patch('/request/:id', middleware_user.requireAuthentication, function(req, res) {
     var requestId = req.params.id;
     var body = _.pick(req.body, 'partnerId', 'description', 'appointmentTime', 'status');
     var attributes = {};
@@ -430,7 +432,7 @@ app.patch('/request/:id', middleware_user.requireAuthentication, function(req, r
  * _ header:
  *   + 'Auth': valid token for login session
  */
-app.delete('/users/login', middleware_user.requireAuthentication, function(req, res) {
+router.delete('/users/login', middleware_user.requireAuthentication, function(req, res) {
     req.token.destroy().then(function() { // Destroy current valid token for login session
         res.status(204).send();
     }).catch(function(e) {
@@ -451,7 +453,7 @@ app.delete('/users/login', middleware_user.requireAuthentication, function(req, 
  * @res: 
  * - body: Pulic JSON format of created account
  */
-app.post('/partners', function(req, res) {
+router.post('/partners', function(req, res) {
     var body = _.pick(req.body, 'partnerName', 'email', 'address', 'phone', 'password');
 
     profiles_db.partner.create(body).then(function(partner) { // Create new partner account
@@ -475,7 +477,7 @@ app.post('/partners', function(req, res) {
  * _ header:
  *   + 'Auth': valid token for login session
  */
-app.post('/partners/login', function(req, res) {
+router.post('/partners/login', function(req, res) {
     var body = _.pick(req.body, 'email', 'password');
     var partnerInstance;
 
@@ -516,7 +518,7 @@ app.post('/partners/login', function(req, res) {
  *   + requests: JSON format of all requests
  * _ header: 'Auth': valid token for login session
  */
-app.get('/partners/requests', middleware_partner.requireAuthentication, function(req, res) {
+router.get('/partners/requests', middleware_partner.requireAuthentication, function(req, res) {
     var query = req.query;
     var where = {
         partnerId: req.partner.get('uid')
@@ -567,7 +569,7 @@ app.get('/partners/requests', middleware_partner.requireAuthentication, function
     })
 });
 
-app.get('/partners/requests/:id', middleware_partner.requireAuthentication, function(req, res) {
+router.get('/partners/requests/:id', middleware_partner.requireAuthentication, function(req, res) {
     var requestId = req.params.id;
 
     requests_db.request.findOne({
@@ -588,7 +590,7 @@ app.get('/partners/requests/:id', middleware_partner.requireAuthentication, func
     });
 });
 
-app.patch('/partners/request/:id', middleware_partner.requireAuthentication, function(req, res) {
+router.patch('/partners/request/:id', middleware_partner.requireAuthentication, function(req, res) {
     var requestId = req.params.id;
     var body = _.pick(req.body, 'GPResponse', 'appointmentTime', 'status');
     var attributes = {};
@@ -661,7 +663,7 @@ app.patch('/partners/request/:id', middleware_partner.requireAuthentication, fun
  *   + 'Auth': valid token for login session
  */
 
-app.delete('/partners/login', middleware_partner.requireAuthentication, function(req, res) {
+router.delete('/partners/login', middleware_partner.requireAuthentication, function(req, res) {
     req.token.destroy().then(function() { // Destroy current valid token for login session
         res.status(204).send();
     }).catch(function(e) {
@@ -682,7 +684,7 @@ app.delete('/partners/login', middleware_partner.requireAuthentication, function
  * @res: 
  * - body: Pulic JSON format of created account
  */
-app.post('/admins', function(req, res) {
+router.post('/admins', function(req, res) {
     var body = _.pick(req.body, 'email', 'password');
 
     profiles_db.admin.create(body).then(function(admin) { // Create new admin account
@@ -706,7 +708,7 @@ app.post('/admins', function(req, res) {
  * _ header:
  *   + 'Auth': valid token for login session
  */
-app.post('/admins/login', function(req, res) {
+router.post('/admins/login', function(req, res) {
     var body = _.pick(req.body, 'email', 'password');
     var adminInstance;
 
@@ -748,7 +750,7 @@ app.post('/admins/login', function(req, res) {
  *   + requests: JSON format of all requests
  * _ header: 'Auth': valid token for login session
  */
-app.get('/admins/requests', middleware_admin.requireAuthentication, function(req, res) {
+router.get('/admins/requests', middleware_admin.requireAuthentication, function(req, res) {
     var query = req.query;
     var where = {};
     var result = {
@@ -822,7 +824,7 @@ app.get('/admins/requests', middleware_admin.requireAuthentication, function(req
  * @res:
  * _ body: JSON format of all users
  */
-app.get('/admins/users', middleware_admin.requireAuthentication, function(req, res) {
+router.get('/admins/users', middleware_admin.requireAuthentication, function(req, res) {
     var query = req.query;
     var result = {
         offset: 0,
@@ -871,7 +873,7 @@ app.get('/admins/users', middleware_admin.requireAuthentication, function(req, r
  * @res:
  * _ body: JSON format of all partners
  */
-app.get('/admins/partners', middleware_admin.requireAuthentication, function(req, res) {
+router.get('/admins/partners', middleware_admin.requireAuthentication, function(req, res) {
     var query = req.query;
     var result = {
         offset: 0,
@@ -908,6 +910,16 @@ app.get('/admins/partners', middleware_admin.requireAuthentication, function(req
     })
 });
 
+router.post('/admins/gps', middleware_admin.requireAuthentication, function(req, res) {
+    var body = _.pick(req.body, 'gpName', 'phone', 'longitude', 'latitude');
+
+    profiles_db.admin.create(body).then(function(admin) { // Create new admin account
+        res.status(200).json(admin.toPublicJSON());
+    }, function(e) {
+        res.status(400).json(e.errors);
+    });
+});
+
 /** Logout admin account
  *
  * @author Nguyen Van Hoang
@@ -918,7 +930,7 @@ app.get('/admins/partners', middleware_admin.requireAuthentication, function(req
  * _ header:
  *   + 'Auth': valid token for login session
  */
-app.delete('/admins/login', middleware_admin.requireAuthentication, function(req, res) {
+router.delete('/admins/login', middleware_admin.requireAuthentication, function(req, res) {
     req.token.destroy().then(function() { // Destroy current valid token for login session
         res.status(204).send();
     }).catch(function(e) {

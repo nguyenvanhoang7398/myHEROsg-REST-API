@@ -32,6 +32,25 @@ module.exports = function(sequelize, DataTypes) {
 			validate: {
 				isInt: true
 			}
+		},
+		longitude: {
+			type: DataTypes.DOUBLE,
+			allowNull: false,
+			validate: {
+				isDecimal: true
+			}
+		},
+		latitude: {
+			type: DataTypes.DOUBLE,
+			allowNull: false,
+			validate: {
+				isDecimal: true
+			}
+		},
+		isPartner: {
+			type: DataTypes.BOOLEAN,
+			allowNull: false,
+			defaultValue: false
 		}
 	});
 };

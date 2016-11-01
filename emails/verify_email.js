@@ -12,7 +12,7 @@ module.exports = function(email, host) {
 		console.log("Send verification email to: " + email);
 		var encryptedEmail = crypt.encrypt(email); // encrypt email
 
-		var link = "http://" + host + "/verify?email=" + encryptedEmail; // verifying link sent to user
+		var link = "http://" + host + "/api/verify?email=" + encryptedEmail; // verifying link sent to user
 		var email_format = format(link);
 
 		var mailOptions = { // mail options
